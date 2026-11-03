@@ -74,7 +74,9 @@ def fetch(session) -> list[Listing]:
 
     items = api.get(f"{API}/datasets/{run['defaultDatasetId']}/items", params={"clean": "true"}, timeout=60).json()
     log.info("yad2: run %s %s, %d items", run["id"], run["status"], len(items))
-    if run["status"] != "SUCCEEDED" and not items:
+    if not items:
         run_log = api.get(f"{API}/actor-runs/{run['id']}/log", timeout=30).text
-        raise RuntimeError(f"apify run {run['status']}:\n{run_log[-1500:]}")
+        if run["status"] != "SUCCEEDED":
+            raise RuntimeError(f"apify run {run['status']}:\n{run_log[-1500:]}")
+        log.info("yad2 actor log (tail):\n%s", run_log[-3000:])
     return [from_item(it) for it in items if it.get("id") and "אשדוד" in str(it.get("city") or "אשדוד")]
