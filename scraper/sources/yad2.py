@@ -5,6 +5,7 @@ remember what it already returned, so each run only pays for new listings.
 """
 import logging
 import os
+import time
 
 import requests
 
@@ -15,7 +16,8 @@ log = logging.getLogger(__name__)
 NAME = "yad2"
 NEEDS_DETAILS = False
 ACTOR = "nice_dev~yad2-listings-scraper"
-RUN_URL = f"https://api.apify.com/v2/acts/{ACTOR}/run-sync-get-dataset-items"
+API = "https://api.apify.com/v2"
+RUN_TIMEOUT = 480  # seconds; the GitHub job allows 15 minutes
 
 ACTOR_INPUT = {
     "dealType": "rent",
@@ -23,7 +25,7 @@ ACTOR_INPUT = {
     "sortBy": "newest",
     "onlyNew": True,
     "stateKey": "ashdod-rent-v2",
-    "maxItems": int(os.environ.get("YAD2_MAX_ITEMS", "40")),
+    "maxItems": int(os.environ.get("YAD2_MAX_ITEMS", "25")),
     "extractDetails": True,
     "includeContacts": True,
     "stopOnBlocked": True,
@@ -59,21 +61,20 @@ def from_item(it: dict) -> Listing:
 
 
 def fetch(session) -> list[Listing]:
-    token = os.environ["APIFY_TOKEN"]
-    r = requests.post(
-        RUN_URL,
-        params={"timeout": 300},
-        headers={"Authorization": f"Bearer {token}"},
-        json=ACTOR_INPUT,
-        timeout=330,
-    )
+    # Start the run and poll it: the run-sync endpoint gives up after ~5 minutes, and detail pages take longer.
+    api = requests.Session()
+    api.headers["Authorization"] = f"Bearer {os.environ['APIFY_TOKEN']}"
+    r = api.post(f"{API}/acts/{ACTOR}/runs", params={"timeout": RUN_TIMEOUT}, json=ACTOR_INPUT, timeout=30)
     r.raise_for_status()
-    items = r.json()
-    if isinstance(items, dict):  # Apify returns an error object instead of a list
-        raise RuntimeError(f"apify: {str(items)[:300]}")
-    log.info("yad2: actor returned %d items, cities=%s", len(items), sorted({str(i.get("city")) for i in items})[:5])
-    if not items:  # surface the actor's own log so the GitHub run shows why
-        run_log = requests.get(f"https://api.apify.com/v2/acts/{ACTOR}/runs/last/log",
-                               headers={"Authorization": f"Bearer {token}"}, timeout=30).text
-        log.warning("yad2 actor log (tail):\n%s", run_log[-2500:])
+    run = r.json()["data"]
+    deadline = time.time() + RUN_TIMEOUT + 60
+    while run["status"] in ("READY", "RUNNING") and time.time() < deadline:
+        time.sleep(10)
+        run = api.get(f"{API}/actor-runs/{run['id']}", timeout=30).json()["data"]
+
+    items = api.get(f"{API}/datasets/{run['defaultDatasetId']}/items", params={"clean": "true"}, timeout=60).json()
+    log.info("yad2: run %s %s, %d items", run["id"], run["status"], len(items))
+    if run["status"] != "SUCCEEDED" and not items:
+        run_log = api.get(f"{API}/actor-runs/{run['id']}/log", timeout=30).text
+        raise RuntimeError(f"apify run {run['status']}:\n{run_log[-1500:]}")
     return [from_item(it) for it in items if it.get("id") and "אשדוד" in str(it.get("city") or "אשדוד")]
