@@ -72,4 +72,8 @@ def fetch(session) -> list[Listing]:
     if isinstance(items, dict):  # Apify returns an error object instead of a list
         raise RuntimeError(f"apify: {str(items)[:300]}")
     log.info("yad2: actor returned %d items, cities=%s", len(items), sorted({str(i.get("city")) for i in items})[:5])
+    if not items:  # surface the actor's own log so the GitHub run shows why
+        run_log = requests.get(f"https://api.apify.com/v2/acts/{ACTOR}/runs/last/log",
+                               headers={"Authorization": f"Bearer {token}"}, timeout=30).text
+        log.warning("yad2 actor log (tail):\n%s", run_log[-2500:])
     return [from_item(it) for it in items if it.get("id") and "אשדוד" in str(it.get("city") or "אשדוד")]
