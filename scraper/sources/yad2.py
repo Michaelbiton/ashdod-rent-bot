@@ -3,6 +3,7 @@
 Yad2 blocks plain HTTP clients, so we use a paid Apify actor. `onlyNew` makes the actor
 remember what it already returned, so each run only pays for new listings.
 """
+import logging
 import os
 
 import requests
@@ -10,6 +11,7 @@ import requests
 from ..models import Listing
 from ..normalize import norm_neighborhood, norm_phone, norm_street
 
+log = logging.getLogger(__name__)
 NAME = "yad2"
 NEEDS_DETAILS = False
 ACTOR = "nice_dev~yad2-listings-scraper"
@@ -20,7 +22,7 @@ ACTOR_INPUT = {
     "location": "Ashdod",
     "sortBy": "newest",
     "onlyNew": True,
-    "stateKey": "ashdod-rent",
+    "stateKey": "ashdod-rent-v2",
     "maxItems": int(os.environ.get("YAD2_MAX_ITEMS", "40")),
     "extractDetails": True,
     "includeContacts": True,
@@ -60,11 +62,14 @@ def fetch(session) -> list[Listing]:
     token = os.environ["APIFY_TOKEN"]
     r = requests.post(
         RUN_URL,
-        params={"timeout": 240},
+        params={"timeout": 300},
         headers={"Authorization": f"Bearer {token}"},
         json=ACTOR_INPUT,
-        timeout=270,
+        timeout=330,
     )
     r.raise_for_status()
     items = r.json()
-    return [from_item(it) for it in items if it.get("id") and it.get("city", "אשדוד") == "אשדוד"]
+    if isinstance(items, dict):  # Apify returns an error object instead of a list
+        raise RuntimeError(f"apify: {str(items)[:300]}")
+    log.info("yad2: actor returned %d items, cities=%s", len(items), sorted({str(i.get("city")) for i in items})[:5])
+    return [from_item(it) for it in items if it.get("id") and "אשדוד" in str(it.get("city") or "אשדוד")]

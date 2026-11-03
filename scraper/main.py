@@ -27,6 +27,8 @@ def run_source(src, db: DB, tg: Telegram, session, searches, recent, admin):
     fail_key = f"fails:{src.NAME}"
     try:
         items = src.fetch(session)
+        if not items and src.NAME != "yad2":  # an empty board means the page changed or we were blocked
+            raise RuntimeError("no listings returned")
     except Exception as e:
         fails = (db.kv_get(fail_key) or 0) + 1
         db.kv_set(fail_key, fails)
@@ -38,7 +40,8 @@ def run_source(src, db: DB, tg: Telegram, session, searches, recent, admin):
 
     known = db.known_ids(src.NAME, [i.source_id for i in items])
     new = [i for i in items if i.source_id not in known]
-    bootstrap = not db.kv_get(f"bootstrapped:{src.NAME}")
+    # first listings ever seen from this source are stored quietly (backfill sends the matching ones)
+    bootstrap = not db.source_listings(src.NAME, days=3650, limit=1)
     log.info("%s: %d listings, %d new%s", src.NAME, len(items), len(new), " (bootstrap)" if bootstrap else "")
 
     for n, listing in enumerate(new):
@@ -64,17 +67,17 @@ def run_source(src, db: DB, tg: Telegram, session, searches, recent, admin):
 
         alert_searches(listing, db, tg, searches, recent)
 
-    if bootstrap:
-        db.kv_set(f"bootstrapped:{src.NAME}", True)
     return True
 
 
 def backfill(source: str, db: DB, tg: Telegram, searches, recent):
     """A search seen for the first time gets the matching listings that already exist, up to BACKFILL_LIMIT."""
-    pending = [s for s in searches if not db.kv_get(f"backfilled:{s['id']}:{source}")]
+    pending = [s for s in searches if not db.kv_get(f"backfill:{s['id']}:{source}")]
     if not pending:
         return
     existing = db.source_listings(source)
+    if not existing:  # nothing collected yet; try again next run
+        return
     for s in pending:
         matches = [(l, m) for l in existing if (m := match(l, s))]
         matches.sort(key=lambda lm: not lm[1].full)  # full matches first, newest first within each
@@ -93,7 +96,7 @@ def backfill(source: str, db: DB, tg: Telegram, searches, recent):
             except Exception:
                 log.exception("backfill alert to %s failed", s["chat_id"])
         log.info("backfill %s search %s: %d sent", source, s["id"], sent)
-        db.kv_set(f"backfilled:{s['id']}:{source}", True)
+        db.kv_set(f"backfill:{s['id']}:{source}", True)
 
 
 def alert_searches(listing, db: DB, tg: Telegram, searches, recent):

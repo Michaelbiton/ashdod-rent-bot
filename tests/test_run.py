@@ -81,7 +81,7 @@ def test_bootstrap_then_alert_then_duplicate(monkeypatch):
     src = FakeSource([[L("old", house_number="3")], [L("old", house_number="3"), L("new")]])
 
     main.run_source(src, db, tg, None, SEARCHES, [], admin=None)    # first run: remember, don't alert
-    assert tg.alerts == [] and db.kv["bootstrapped:fake"] is True
+    assert tg.alerts == []
 
     recent = list(db.listings)
     main.run_source(src, db, tg, None, SEARCHES, recent, admin=None)
@@ -90,7 +90,7 @@ def test_bootstrap_then_alert_then_duplicate(monkeypatch):
     # a repost of the same apartment: reply under the original alert, no second alert
     other = FakeSource([[L("k1", source="komo", house_number="12", price=5450)]])
     other.NAME = "komo"
-    db.kv["bootstrapped:komo"] = True
+    db.add_listing(L("k0", source="komo", house_number="99"), None)   # komo is past its first run
     main.run_source(other, db, tg, None, SEARCHES, recent, admin=None)
     assert len(tg.alerts) == 1
     assert tg.texts and tg.texts[0][0] == 111 and tg.texts[0][2]["reply_to_message_id"] == 101
@@ -113,6 +113,14 @@ def test_backfill_sends_existing_matches_once(monkeypatch):
 
     main.backfill("fake", db, tg, SEARCHES, db.listings)     # second run: nothing new
     assert len(tg.alerts) == 3
+
+
+def test_empty_source_is_a_failure_and_skips_backfill():
+    db, tg = FakeDB(), FakeTG()
+    assert main.run_source(FakeSource([[]]), db, tg, None, SEARCHES, [], admin=None) is False
+    assert db.kv["fails:fake"] == 1
+    main.backfill("fake", db, tg, SEARCHES, [])
+    assert not any(k.startswith("backfill:") for k in db.kv)  # retried once listings exist
 
 
 def test_failure_warning(monkeypatch):
