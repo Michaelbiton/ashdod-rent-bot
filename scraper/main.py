@@ -6,8 +6,8 @@ import time
 from . import dedupe, summarizer
 from .db import DB
 from .matcher import match
-from .notifier import Telegram, format_duplicate
-from .sources import homeless, http_session, komo, yad2
+from .notifier import Telegram
+from .sources import facebook, homeless, http_session, komo, yad2
 
 log = logging.getLogger("scraper")
 MAX_DETAIL_FETCHES = 30   # per source per run; new listings beyond this are matched on list data only
@@ -19,6 +19,8 @@ def enabled_sources():
     sources = [homeless, komo]
     if os.environ.get("APIFY_TOKEN"):
         sources.insert(0, yad2)
+        if facebook.groups():
+            sources.append(facebook)
     return sources
 
 
@@ -27,7 +29,7 @@ def run_source(src, db: DB, tg: Telegram, session, searches, recent, admin):
     fail_key = f"fails:{src.NAME}"
     try:
         items = src.fetch(session)
-        if not items and src.NAME != "yad2":  # an empty board means the page changed or we were blocked
+        if not items and getattr(src, "EMPTY_IS_ERROR", False):  # an empty board: page changed or blocked
             raise RuntimeError("no listings returned")
     except Exception as e:
         fails = (db.kv_get(fail_key) or 0) + 1
@@ -58,12 +60,8 @@ def run_source(src, db: DB, tg: Telegram, session, searches, recent, admin):
         if bootstrap:
             continue
 
-        previous = db.group_alerts(listing.group_id) if group_id else []
-        if previous:
-            for a in previous:
-                if a["status"] != "dismissed" and a["message_id"]:
-                    tg.send_text(a["chat_id"], format_duplicate(listing), reply_to_message_id=a["message_id"])
-            continue
+        if group_id and db.group_alerts(listing.group_id):
+            continue  # same apartment already alerted: never send it again
 
         alert_searches(listing, db, tg, searches, recent)
 

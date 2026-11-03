@@ -1,4 +1,8 @@
 import re
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+IL = ZoneInfo("Asia/Jerusalem")
 
 # Keep in sync with NEIGHBORHOODS in bot/src/index.js
 QUARTERS = ["א", "ב", "ג", "ד", "ה", "ו", "ז", "ח", "ט", "י", "יא", "יב", "יג", "טו", "טז", "יז"]
@@ -66,6 +70,32 @@ def norm_phone(s: str | None) -> str | None:
     if d.startswith("972"):
         d = "0" + d[3:]
     return d if len(d) >= 9 else None
+
+
+def parse_il_date(s: str | None) -> str | None:
+    """'03/11/2026' -> ISO date (midnight, Israel time)."""
+    m = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})", s or "")
+    if not m:
+        return None
+    d, mo, y = map(int, m.groups())
+    return datetime(y, mo, d, tzinfo=IL).isoformat()
+
+
+_UNITS = [("דק", timedelta(minutes=1)), ("שע", timedelta(hours=1)), ("יום", timedelta(days=1)),
+          ("ימים", timedelta(days=1)), ("שבוע", timedelta(weeks=1)), ("חודש", timedelta(days=30))]
+
+
+def parse_ago(s: str | None, now: datetime | None = None) -> str | None:
+    """'עודכן לפני: 2 שעות' / 'לפני שעה' / 'לפני 3 ימים' -> ISO timestamp."""
+    m = re.search(r"לפני:?\s*(\d+)?\s*(\S+)", s or "")
+    if not m:
+        return None
+    n = int(m.group(1) or 1)
+    unit = next((delta for key, delta in _UNITS if m.group(2).startswith(key)), None)
+    if unit is None:
+        return None
+    now = now or datetime.now(IL)
+    return (now - n * unit).replace(second=0, microsecond=0).isoformat()
 
 
 def norm_street(s: str | None) -> str | None:

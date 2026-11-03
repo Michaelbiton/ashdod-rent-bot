@@ -56,6 +56,8 @@ create table if not exists listings (
   description   text,
   images        text[] not null default '{}',
   entry_date    text,
+  published_at  timestamptz,     -- when the ad was first posted (if the site says)
+  bumped_at     timestamptz,     -- last bump / update shown by the site
   first_seen    timestamptz not null default now(),
   unique (source, source_id)
 );

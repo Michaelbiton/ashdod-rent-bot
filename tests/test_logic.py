@@ -1,7 +1,27 @@
+from datetime import datetime
+
 from scraper import dedupe
 from scraper.matcher import match
 from scraper.models import Listing
-from scraper.notifier import format_alert, keyboard, whatsapp_link
+from scraper.normalize import IL, parse_ago, parse_il_date
+from scraper.notifier import format_alert, format_dates, format_when, keyboard, whatsapp_link
+
+NOW = datetime(2026, 11, 3, 15, 0, tzinfo=IL)
+
+
+def test_date_parsing_and_display():
+    assert parse_il_date("03/11/2026").startswith("2026-11-03T00:00:00+02:00")
+    assert parse_ago("עודכן לפני: 2 שעות", NOW).startswith("2026-11-03T13:00")
+    assert parse_ago("עודכן לפני: שעה", NOW).startswith("2026-11-03T14:00")
+    assert parse_ago("לפני 3 ימים", NOW).startswith("2026-10-31T15:00")
+    assert format_when("2026-11-03T10:14:00.000Z", NOW) == "היום 12:14"      # UTC -> Israel
+    assert format_when("2026-11-02T00:00:00+02:00", NOW) == "אתמול"         # date only, no clock
+    assert format_when("2026-10-30T09:00:00+02:00", NOW) == "לפני 4 ימים"
+    assert format_when("2026-10-01T09:00:00+03:00", NOW) == "01/10/2026"
+    both = L(published_at="2026-10-01T09:00:00+03:00", bumped_at="2026-11-02T08:30:00+02:00")
+    assert format_dates(both, NOW) == "🗓 פורסם: 01/10/2026 · 🔄 הוקפץ: אתמול 08:30"
+    assert format_dates(L(bumped_at="2026-11-03T00:00:00+02:00"), NOW) == "🔄 עודכן/הוקפץ: היום"
+    assert format_dates(L(), NOW) is None
 
 
 def L(**kw):
@@ -28,8 +48,13 @@ def test_full_match():
 def test_partial_when_unknown():
     m = match(L(), S(need_parking=True))
     assert m and m.missing == ["חניה"]
-    m = match(L(neighborhood=None, price=None), S(neighborhoods=["רובע א"], price_max=5000))
-    assert m.missing == ["רובע", "מחיר"]
+    m = match(L(neighborhood=None), S(neighborhoods=["רובע א"], price_max=6000))
+    assert m.missing == ["רובע"]
+
+
+def test_no_price_is_never_sent():
+    assert match(L(price=None), S()) is None
+    assert match(L(price=0), S()) is None
 
 
 def test_rejections():

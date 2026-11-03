@@ -31,6 +31,8 @@ def _in_range(value, lo, hi) -> bool:
 
 
 def match(listing: Listing, s: dict) -> Match | None:
+    if not listing.price:  # listings without a price are never sent
+        return None
     missing = []
 
     if s.get("neighborhoods"):

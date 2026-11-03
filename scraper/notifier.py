@@ -1,12 +1,14 @@
 """Telegram messages sent by the scraper (alerts, duplicate notes, admin warnings)."""
 import html
 import logging
+from datetime import datetime
 from urllib.parse import quote
 
 import requests
 
 from .matcher import Match
 from .models import SOURCE_NAMES, Listing
+from .normalize import IL
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +49,38 @@ class Telegram:
         return self.send_text(chat_id, text, reply_markup=markup)["message_id"]
 
 
+def format_when(iso: str | None, now: datetime | None = None) -> str | None:
+    """ISO timestamp -> 'היום 14:05' / 'אתמול' / 'לפני 3 ימים' / '02/10/2026' (Israel time)."""
+    if not iso:
+        return None
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(IL)
+    except ValueError:
+        return None
+    now = now or datetime.now(IL)
+    days = (now.date() - dt.date()).days
+    has_time = (dt.hour, dt.minute) != (0, 0)
+    clock = f" {dt:%H:%M}" if has_time else ""
+    if days <= 0:
+        return f"היום{clock}"
+    if days == 1:
+        return f"אתמול{clock}"
+    if days < 7:
+        return f"לפני {days} ימים"
+    return f"{dt:%d/%m/%Y}"
+
+
+def format_dates(l: Listing, now: datetime | None = None) -> str | None:
+    published, bumped = format_when(l.published_at, now), format_when(l.bumped_at, now)
+    if published and bumped and bumped != published:
+        return f"🗓 פורסם: {published} · 🔄 הוקפץ: {bumped}"
+    if published:
+        return f"🗓 פורסם: {published}"
+    if bumped:
+        return f"🔄 עודכן/הוקפץ: {bumped}"
+    return None
+
+
 def _yes_no(v: bool | None) -> str:
     return {True: "✅", False: "❌", None: "❔"}[v]
 
@@ -71,6 +105,9 @@ def format_alert(l: Listing, m: Match, summary: str | None, median: tuple[int, s
         lines.append("🧑‍💼 תיווך" if l.is_broker else "👤 פרטי")
     if l.entry_date:
         lines.append(f"📅 כניסה: {e(l.entry_date)}")
+    dates = format_dates(l)
+    if dates:
+        lines.append(dates)
     if m.missing:
         lines.append(f"⚠️ לא צוין במודעה: {e(', '.join(m.missing))}")
     if summary:

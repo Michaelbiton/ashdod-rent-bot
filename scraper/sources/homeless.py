@@ -4,13 +4,14 @@ from urllib.parse import quote
 from bs4 import BeautifulSoup
 
 from ..models import Listing
-from ..normalize import norm_neighborhood, parse_float, parse_floor, parse_int, split_address
+from ..normalize import norm_neighborhood, parse_float, parse_floor, parse_il_date, parse_int, split_address
 from . import get_html
 
 NAME = "homeless"
 BASE = "https://www.homeless.co.il"
 LIST_URL = f"{BASE}/rent/city={quote('אשדוד')}"
 NEEDS_DETAILS = True
+EMPTY_IS_ERROR = True
 
 FEATURES = {"ממד": "has_mamad", "מרפסת": "has_balcony", "חניה": "has_parking", "מעלית": "has_elevator"}
 
@@ -40,6 +41,7 @@ def parse_list(html: str) -> list[Listing]:
             floor=parse_floor(tds[7]),
             price=parse_int(tds[8]),
             entry_date=tds[9] or None,
+            bumped_at=parse_il_date(tds[10]),   # homeless shows the date of the last update/bump
             is_broker=False,
             images=images,
         ))

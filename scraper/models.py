@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field, asdict
 
-SOURCE_NAMES = {"yad2": "יד2", "homeless": "הומלס", "komo": "קומו"}
+SOURCE_NAMES = {"yad2": "יד2", "homeless": "הומלס", "komo": "קומו", "facebook": "פייסבוק"}
 
 
 @dataclass
@@ -25,6 +25,8 @@ class Listing:
     description: str | None = None
     images: list[str] = field(default_factory=list)
     entry_date: str | None = None
+    published_at: str | None = None   # ISO 8601; when the ad was first posted
+    bumped_at: str | None = None      # ISO 8601; last bump / update shown by the site
     # filled in after insert
     id: int | None = None
     group_id: int | None = None

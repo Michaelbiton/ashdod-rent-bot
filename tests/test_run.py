@@ -55,6 +55,7 @@ class FakeTG:
 class FakeSource:
     NAME = "fake"
     NEEDS_DETAILS = False
+    EMPTY_IS_ERROR = True
 
     def __init__(self, batches):
         self.batches = batches
@@ -93,7 +94,7 @@ def test_bootstrap_then_alert_then_duplicate(monkeypatch):
     db.add_listing(L("k0", source="komo", house_number="99"), None)   # komo is past its first run
     main.run_source(other, db, tg, None, SEARCHES, recent, admin=None)
     assert len(tg.alerts) == 1
-    assert tg.texts and tg.texts[0][0] == 111 and tg.texts[0][2]["reply_to_message_id"] == 101
+    assert tg.texts == []   # duplicates are silent
 
 
 def test_backfill_sends_existing_matches_once(monkeypatch):

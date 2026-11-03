@@ -38,6 +38,7 @@ def test_homeless_list():
     assert first.street == "הרב הרצוג"
     assert (first.rooms, first.floor, first.price) == (2.5, 1, 3600)
     assert first.is_broker is False
+    assert first.bumped_at.startswith("2026-11-03")
     assert all(img.startswith("http") for i in items for img in i.images)
 
 
@@ -68,6 +69,7 @@ def test_komo_details():
     assert item.has_parking is True          # "פלוס חנייה" in the ad text
     assert item.has_balcony is None          # not mentioned -> unknown, never False
     assert item.description.startswith("5 חדרים")
+    assert item.bumped_at is not None        # "עודכן לפני: 2 שעות"
 
 
 def test_yad2_mapping():
@@ -77,7 +79,9 @@ def test_yad2_mapping():
         "squareMeters": 90, "price": 5500, "hasSecureRoom": True, "hasBalcony": None, "balconies": 2,
         "hasParking": False, "hasElevator": True, "sellerType": "private", "contactPhone": "050-1234567",
         "images": ["https://img.yad2.co.il/a.jpg"], "isImmediateEntrance": True, "city": "אשדוד",
+        "publishedAt": "2026-10-01T06:00:00.000Z", "bumpedAt": "2026-11-02T06:30:00.000Z",
     })
+    assert (l.published_at, l.bumped_at) == ("2026-10-01T06:00:00.000Z", "2026-11-02T06:30:00.000Z")
     assert l.neighborhood == "רובע טו"
     assert l.has_balcony is True and l.has_parking is False and l.is_broker is False
     assert l.phone == "0501234567" and l.entry_date == "מיידי"

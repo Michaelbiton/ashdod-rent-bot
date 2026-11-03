@@ -1,0 +1,6 @@
+# Public Facebook groups to scan, one URL per line (lines starting with # are ignored).
+# Only PUBLIC groups work.
+https://www.facebook.com/groups/215752412333714
+https://www.facebook.com/groups/8971758112886635
+https://www.facebook.com/groups/793468597978429
+https://www.facebook.com/groups/575016292563360

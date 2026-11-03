@@ -5,13 +5,14 @@ from urllib.parse import quote
 from bs4 import BeautifulSoup
 
 from ..models import Listing
-from ..normalize import norm_neighborhood, parse_float, parse_floor, parse_int, split_address
+from ..normalize import norm_neighborhood, parse_ago, parse_float, parse_floor, parse_int, split_address
 from . import get_html
 
 NAME = "komo"
 BASE = "https://www.komo.co.il"
 LIST_URL = f"{BASE}/code/nadlan/apartments-for-rent.asp?cityName={quote('אשדוד')}"
 NEEDS_DETAILS = True
+EMPTY_IS_ERROR = True
 
 NON_RESIDENTIAL = ("משרד", "חנו", "מחסן", "מגרש", "חניה", "מבנה", "אולם", "מסחרי", "קליניק")
 FEATURES = {"mamad": "has_mamad", "maalit": "has_elevator"}
@@ -64,6 +65,9 @@ def parse_details(html: str, listing: Listing) -> None:
         if attr:
             setattr(listing, attr, bool(m.group(2)))
     listing.is_broker = "tivuhName" in html or "רישיון תיווך" in html
+    updated = re.search(r'class="m_updateDate[^"]*">([^<]+)<', html)
+    if updated:
+        listing.bumped_at = parse_ago(updated.group(1))
     # Komo has no balcony/parking flags, so we only learn them from the ad text (never "False").
     about = BeautifulSoup(html, "html.parser").select_one("#teurWrap")
     if about:

@@ -58,6 +58,8 @@ def from_item(it: dict) -> Listing:
         description=it.get("description"),
         images=(it.get("images") or ([it["imageUrl"]] if it.get("imageUrl") else []))[:10],
         entry_date="מיידי" if it.get("isImmediateEntrance") else it.get("entranceDate"),
+        published_at=it.get("publishedAt"),
+        bumped_at=it.get("bumpedAt") or it.get("updatedAt"),
     )
 
 
