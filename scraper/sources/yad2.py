@@ -21,7 +21,8 @@ RUN_TIMEOUT = 480  # seconds; the GitHub job allows 15 minutes
 
 ACTOR_INPUT = {
     "dealType": "rent",
-    "location": "Ashdod",
+    # The actor's "Ashdod" place lookup adds area/region codes that return no cards; the plain city URL works.
+    "startUrls": [{"url": "https://www.yad2.co.il/realestate/rent?city=0070"}],
     "sortBy": "newest",
     "onlyNew": True,
     "stateKey": "ashdod-rent-v2",
