@@ -1,0 +1,11 @@
+name = "ashdod-rent-bot"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Plain settings. Secrets are set with:
+#   npx wrangler secret put TELEGRAM_BOT_TOKEN
+#   npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
+#   npx wrangler secret put SUPABASE_SERVICE_KEY
+[vars]
+SUPABASE_URL = "https://dhvzdueapyzluaxhfdwb.supabase.co"
+ADMIN_CHAT_ID = "584897131"
