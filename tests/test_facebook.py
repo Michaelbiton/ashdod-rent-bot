@@ -22,6 +22,14 @@ def test_quarter_with_geresh_and_broker():
     assert parse_post("דירת 2 חדרים בקומת קרקע ברובע ב, 3500 ש\"ח")["floor"] == 0
 
 
+def test_other_cities_and_no_location():
+    assert parse_post("להשכרה בבניין חדש בהרצל בת ים דירת 4 חדרים, ממ\"ד, 7500 ש\"ח") is None
+    assert parse_post("דירת 3 חדרים באשקלון ברובע ג, 4000 ש\"ח") is None      # names another city
+    assert parse_post("להשכרה דירת 4 חדרים משופצת, 5000 ש\"ח, כניסה מיידית") is None  # no neighborhood
+    f = parse_post("אשדוד, רובע ג - דירת 3 חדרים, 4200 ש\"ח (לא אשקלון!)")
+    assert f["neighborhood"] == "רובע ג"                                       # Ashdod named too
+
+
 def test_not_offers():
     assert parse_post("מחפשים דירת 4 חדרים ברובע ז עד 5000 ש\"ח") is None       # seeker
     assert parse_post("דירה למכירה ברובע ב, 4 חדרים, 1,850,000") is None        # sale

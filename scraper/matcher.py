@@ -7,6 +7,7 @@ None    -> something known contradicts the search
 from dataclasses import dataclass, field
 
 from .models import Listing
+from .normalize import find_neighborhood
 
 AMENITIES = [
     ("need_mamad", "has_mamad", 'ממ"ד'),
@@ -31,15 +32,18 @@ def _in_range(value, lo, hi) -> bool:
 
 
 def match(listing: Listing, s: dict) -> Match | None:
-    if not listing.price:  # listings without a price are never sent
+    # Never sent: no price, or no known location (the ad doesn't say where in Ashdod it is).
+    if not listing.price:
+        return None
+    neighborhood = listing.neighborhood or find_neighborhood(listing.text())
+    if not neighborhood:
+        return None
+    if s.get("need_photo") and not any(i.startswith("http") for i in listing.images or []):
         return None
     missing = []
 
-    if s.get("neighborhoods"):
-        if listing.neighborhood is None:
-            missing.append("רובע")
-        elif listing.neighborhood not in s["neighborhoods"]:
-            return None
+    if s.get("neighborhoods") and neighborhood not in s["neighborhoods"]:
+        return None
 
     for value, lo, hi, label in [
         (listing.rooms, s.get("rooms_min"), s.get("rooms_max"), "חדרים"),

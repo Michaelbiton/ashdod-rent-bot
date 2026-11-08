@@ -6,6 +6,7 @@ import time
 from . import dedupe, summarizer
 from .db import DB
 from .matcher import match
+from .normalize import find_neighborhood
 from .notifier import Telegram
 from .sources import facebook, homeless, http_session, komo, yad2
 
@@ -54,6 +55,8 @@ def run_source(src, db: DB, tg: Telegram, session, searches, recent, admin):
             except Exception:
                 log.warning("details failed for %s %s", src.NAME, listing.source_id, exc_info=True)
 
+        if not listing.neighborhood:  # e.g. Yad2/Homeless left it empty but the text says "ברובע י"ז"
+            listing.neighborhood = find_neighborhood(listing.text())
         group_id = dedupe.find_group(listing, recent)
         db.add_listing(listing, group_id)
         recent.insert(0, listing)

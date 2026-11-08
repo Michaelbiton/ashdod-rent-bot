@@ -46,7 +46,7 @@ globalThis.fetch = async (url, opts = {}) => {
     const defaults = table === "searches"
       ? { active: false, neighborhoods: [], exclude_keywords: [], include_keywords: [], rooms_min: null,
           rooms_max: null, price_min: null, price_max: null, need_mamad: false, need_balcony: false,
-          need_parking: false, need_elevator: false, no_broker: false }
+          need_parking: false, need_elevator: false, need_photo: false, no_broker: false }
       : { approved: false, paused: false, state: null, state_data: null };
     const row = { id: nextId++, ...defaults, ...body };
     rows.push(row);
@@ -111,6 +111,8 @@ test("full chat flow", async () => {
 
   await click(2, `s:${s.id}:t:need_mamad`);
   assert.equal(s.need_mamad, true);
+  await click(2, `s:${s.id}:t:need_photo`);
+  assert.equal(s.need_photo, true);
   const idx = NEIGHBORHOODS.indexOf("רובע טו");
   await click(2, `s:${s.id}:nbt:${idx}`);
   assert.deepEqual(s.neighborhoods, ["רובע טו"]);

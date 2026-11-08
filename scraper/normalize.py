@@ -28,6 +28,31 @@ def norm_neighborhood(s: str | None) -> str | None:
     return t or None
 
 
+_QUARTER_IN_TEXT = re.compile(r"(?:רובע|רובה)\s*([א-ת]{1,2})(?:['׳\"״]+([א-ת]))?")
+_PLACE_NAMES = {"מרינה": "מרינה", "סיטי": "סיטי", "קרית איתנים": "קרית איתנים",
+                "קריית איתנים": "קרית איתנים", "בקמה": "בקמה"}
+OTHER_CITIES = re.compile(
+    r"אשקלון|בת ים|יבנה|גן יבנה|קרית מלאכי|קריית מלאכי|גדרה|רחובות|ראשון לציון|באר שבע|"
+    r"נתיבות|שדרות|קרית גת|קריית גת|תל אביב|חולון|ירושלים|בני ברק|ניצן|באר טוביה"
+)
+
+
+def find_neighborhood(text: str | None) -> str | None:
+    """A known Ashdod neighborhood mentioned in free text ('ברובע י"ז', 'במרינה'), else None."""
+    t = text or ""
+    for m in _QUARTER_IN_TEXT.finditer(t):
+        n = norm_neighborhood(f"רובע {m.group(1)}{m.group(2) or ''}")
+        if n in NEIGHBORHOODS:
+            return n
+    return next((v for k, v in _PLACE_NAMES.items() if k in t), None)
+
+
+def mentions_other_city(text: str | None) -> bool:
+    """True when the text names another city and never mentions Ashdod."""
+    t = text or ""
+    return bool(OTHER_CITIES.search(t)) and "אשדוד" not in t
+
+
 def split_address(s: str | None) -> tuple[str | None, str | None]:
     """'שד הרצל 48' -> ('שד הרצל', '48')."""
     street = norm_street(s)

@@ -26,6 +26,7 @@ create table if not exists searches (
   need_balcony      boolean not null default false,
   need_parking      boolean not null default false,
   need_elevator     boolean not null default false,
+  need_photo        boolean not null default false,
   no_broker         boolean not null default false,
   exclude_keywords  text[] not null default '{}',
   include_keywords  text[] not null default '{}',

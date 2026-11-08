@@ -48,8 +48,20 @@ def test_full_match():
 def test_partial_when_unknown():
     m = match(L(), S(need_parking=True))
     assert m and m.missing == ["חניה"]
-    m = match(L(neighborhood=None), S(neighborhoods=["רובע א"], price_max=6000))
-    assert m.missing == ["רובע"]
+
+
+
+def test_location_required():
+    assert match(L(neighborhood=None), S()) is None                                  # nowhere to place it
+    assert match(L(neighborhood=None, description="דירה יפה ברובע י״ז ליד הים"), S()).full  # found in the text
+    assert match(L(neighborhood=None, description="ברובע י״ז"), S(neighborhoods=["רובע א"])) is None
+
+
+def test_photo_required_option():
+    assert match(L(images=[]), S(need_photo=True)) is None
+    assert match(L(images=["/images/nopic.jpg"]), S(need_photo=True)) is None
+    assert match(L(images=["https://x/1.jpg"]), S(need_photo=True)).full
+    assert match(L(images=[]), S()).full                                             # off by default
 
 
 def test_no_price_is_never_sent():

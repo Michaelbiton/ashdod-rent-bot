@@ -10,6 +10,7 @@ const TOGGLES = {
   need_balcony: "מרפסת",
   need_parking: "חניה",
   need_elevator: "מעלית",
+  need_photo: "תמונה",
   no_broker: "בלי תיווך",
 };
 
@@ -238,6 +239,7 @@ function editorText(s) {
     `✅ חובה: ${must.length ? must.join(", ") : "—"}`,
     `🧑‍💼 תיווך: ${s.no_broker ? "בלי תיווך בלבד" : "לא משנה"}`,
   ];
+  lines.push("ℹ️ מודעות בלי מחיר או בלי מיקום באשדוד לא נשלחות אף פעם.");
   if (s.exclude_keywords.length) lines.push(`🚫 לחסום: ${esc(s.exclude_keywords.join(", "))}`);
   if (s.include_keywords.length) lines.push(`➕ לחייב: ${esc(s.include_keywords.join(", "))}`);
   if (!s.active) lines.push("", "כשתסיים, לחץ <b>✅ הפעל</b> כדי להתחיל לקבל התראות.");
@@ -251,7 +253,8 @@ function editorKeyboard(s) {
     [b("📍 רובעים", "nb"), b("🛏 חדרים", "rooms"), b("💰 מחיר", "price")],
     [t("need_mamad"), t("need_balcony")],
     [t("need_parking"), t("need_elevator")],
-    [t("no_broker"), b("🔤 מילות מפתח", "kw")],
+    [t("need_photo"), t("no_broker")],
+    [b("🔤 מילות מפתח", "kw")],
     [b("✏️ שם", "name"), s.active ? b("⏸ כבה", "off") : b("✅ הפעל", "on"), b("🗑 מחק", "del")],
     [{ text: "⬅️ החיפושים שלי", callback_data: "menu:list" }],
   ];

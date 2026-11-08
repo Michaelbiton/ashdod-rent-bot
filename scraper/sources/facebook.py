@@ -13,7 +13,7 @@ from pathlib import Path
 import requests
 
 from ..models import Listing
-from ..normalize import norm_neighborhood, norm_phone, parse_floor
+from ..normalize import find_neighborhood, mentions_other_city, norm_phone, parse_floor
 
 log = logging.getLogger(__name__)
 NAME = "facebook"
@@ -41,7 +41,6 @@ _PRICE = re.compile(
 )
 _ROOMS = re.compile(r"(\d(?:[.,]5)?)\s*(?:וחצי\s*)?(?:חדרים|חדר|חד['׳\"]?)(?!\S*שינה)")
 _HALF = re.compile(r"(\d)\s*וחצי\s*(?:חדרים|חד)")
-_QUARTER = re.compile(r"(?:רובע|רובה)\s*([א-ת]{1,2})(?:['׳\"״]+([א-ת]))?")
 _FLOOR = re.compile(r"קומ(?:ה|ת)\s*[:\-]?\s*(קרקע|\d{1,2})")
 _PHONE = re.compile(r"(?:\+?972[-\s]?|0)5\d[-\s]?\d{3}[-\s]?\d{4}")
 
@@ -78,10 +77,12 @@ def parse_post(text: str) -> dict | None:
         rooms_value = None
     if rooms_value is None and not re.search(r"דיר[הת]|להשכרה|פנטהאוז|דופלקס|יחידת דיור", t):
         return None
-    q = _QUARTER.search(t)
-    neighborhood = norm_neighborhood(f"רובע {q.group(1)}{q.group(2) or ''}") if q else None
+    # The groups also get posts from other cities; keep only posts that name an Ashdod neighborhood.
+    if mentions_other_city(t):
+        return None
+    neighborhood = find_neighborhood(t)
     if not neighborhood:
-        neighborhood = next((n for n in ("מרינה", "סיטי", "קרית איתנים", "בקמה") if n in t), None)
+        return None
     phone = _PHONE.search(t)
     broker = _flag(t, r"תיווך")
     if broker is None and re.search(r"מתווך|משרד תיווך|דמי תיווך", t):
