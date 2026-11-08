@@ -18,6 +18,8 @@ def test_half_rooms_and_negations():
 def test_quarter_with_geresh_and_broker():
     f = parse_post("רובע י'א - 2.5 חד׳ קומה 3, 3900 שח, דמי תיווך חודש")
     assert f["neighborhood"] == "רובע יא" and f["rooms"] == 2.5 and f["is_broker"] is True
+    assert f["floor"] == 3
+    assert parse_post("דירת 2 חדרים בקומת קרקע ברובע ב, 3500 ש\"ח")["floor"] == 0
 
 
 def test_not_offers():

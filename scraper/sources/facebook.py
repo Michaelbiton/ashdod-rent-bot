@@ -13,7 +13,7 @@ from pathlib import Path
 import requests
 
 from ..models import Listing
-from ..normalize import norm_neighborhood, norm_phone
+from ..normalize import norm_neighborhood, norm_phone, parse_floor
 
 log = logging.getLogger(__name__)
 NAME = "facebook"
@@ -42,6 +42,7 @@ _PRICE = re.compile(
 _ROOMS = re.compile(r"(\d(?:[.,]5)?)\s*(?:וחצי\s*)?(?:חדרים|חדר|חד['׳\"]?)(?!\S*שינה)")
 _HALF = re.compile(r"(\d)\s*וחצי\s*(?:חדרים|חד)")
 _QUARTER = re.compile(r"(?:רובע|רובה)\s*([א-ת]{1,2})(?:['׳\"״]+([א-ת]))?")
+_FLOOR = re.compile(r"קומ(?:ה|ת)\s*[:\-]?\s*(קרקע|\d{1,2})")
 _PHONE = re.compile(r"(?:\+?972[-\s]?|0)5\d[-\s]?\d{3}[-\s]?\d{4}")
 
 
@@ -97,6 +98,7 @@ def parse_post(text: str) -> dict | None:
         has_elevator=_flag(t, r"מעלית"),
         is_broker=broker,
         phone=norm_phone(phone.group()) if phone else None,
+        floor=parse_floor(floor.group(1)) if (floor := _FLOOR.search(t)) else None,
     )
 
 

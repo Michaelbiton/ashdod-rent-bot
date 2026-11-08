@@ -1,11 +1,27 @@
 """Find the same apartment posted on another source (or reposted on the same one)."""
+import re
+from difflib import SequenceMatcher
 from statistics import median
 
 from .models import Listing
 
+TEXT_SIMILARITY = 0.8   # same post pasted into several groups, with small edits
+
 
 def _close_price(a: int | None, b: int | None, tolerance=0.05) -> bool:
     return a is not None and b is not None and abs(a - b) <= tolerance * max(a, b)
+
+
+def _norm_text(s: str | None) -> str:
+    return re.sub(r"[^\w]+", " ", s or "").strip().lower()
+
+
+def similar_text(a: str | None, b: str | None) -> bool:
+    ta, tb = _norm_text(a), _norm_text(b)
+    if len(ta) < 40 or len(tb) < 40:
+        return False
+    m = SequenceMatcher(None, ta, tb, autojunk=False)
+    return m.quick_ratio() >= TEXT_SIMILARITY and m.ratio() >= TEXT_SIMILARITY
 
 
 def same_apartment(a: Listing, b: Listing) -> bool:
@@ -13,9 +29,19 @@ def same_apartment(a: Listing, b: Listing) -> bool:
         return True
     if a.rooms is not None and b.rooms is not None and a.rooms != b.rooms:
         return False
-    if a.phone and a.phone == b.phone and _close_price(a.price, b.price):
+    if a.neighborhood and b.neighborhood and a.neighborhood != b.neighborhood:
+        return False
+    if not _close_price(a.price, b.price):
+        return False
+    if a.phone and a.phone == b.phone:
         return True
-    if not (a.street and a.street == b.street and _close_price(a.price, b.price)):
+    if similar_text(a.description, b.description):
+        return True
+    # Same neighborhood, rooms, exact price and floor: almost always one apartment posted twice.
+    if (a.neighborhood and a.rooms is not None and a.price == b.price
+            and a.floor is not None and a.floor == b.floor):
+        return True
+    if not (a.street and a.street == b.street):
         return False
     # Same street and price: also need the house number, or the same floor when one side has no number.
     if a.house_number and b.house_number:

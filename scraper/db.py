@@ -53,7 +53,7 @@ class DB:
         since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         rows = self.select("listings", first_seen=f"gte.{since}", order="first_seen.desc", limit=5000,
                            select="id,group_id,source,source_id,url,neighborhood,street,house_number,"
-                                  "rooms,floor,price,phone")
+                                  "rooms,floor,price,phone,description")
         return [Listing.from_row(r) for r in rows]
 
     def source_listings(self, source: str, days=14, limit=200) -> list[Listing]:

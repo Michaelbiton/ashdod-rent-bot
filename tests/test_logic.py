@@ -85,6 +85,26 @@ def test_dedupe_by_address_and_phone():
     assert dedupe.find_group(L(source="komo", source_id="k3", house_number="12", rooms=4.0), [a]) is None
 
 
+def test_dedupe_same_post_in_several_groups():
+    text = "להשכרה ברובע טו דירת 3 חדרים משופצת עם ממד ומרפסת, 5500 שח, כניסה מיידית, לפרטים בפרטי"
+    a = L(source="facebook", source_id="p1", street=None, description=text)
+    a.group_id = 20
+    edited = text.replace("כניסה מיידית", "כניסה בדצמבר") + " !!"
+    assert dedupe.find_group(L(source="facebook", source_id="p2", street=None, description=edited), [a]) == 20
+    other = "דירה אחרת לגמרי בשכונה אחרת, 5500 שקלים, גינה גדולה וחניה פרטית, בלי תיווך"
+    assert dedupe.find_group(L(source="facebook", source_id="p3", street=None, description=other), [a]) is None
+
+
+def test_dedupe_by_neighborhood_rooms_price_floor():
+    a = L(source="yad2", source_id="y9", street=None, floor=4)
+    a.group_id = 30
+    assert dedupe.find_group(L(source="facebook", source_id="f9", street=None, floor=4), [a]) == 30
+    assert dedupe.find_group(L(source="facebook", source_id="f9", street=None, floor=5), [a]) is None
+    assert dedupe.find_group(L(source="facebook", source_id="f9", street=None, floor=4, price=5600), [a]) is None
+    assert dedupe.find_group(L(source="facebook", source_id="f9", street=None, floor=4,
+                               neighborhood="רובע א"), [a]) is None
+
+
 def test_median():
     recent = [L(source_id=str(i), price=p) for i, p in enumerate([4000, 4500, 5000, 5500, 6000])]
     assert dedupe.median_price(L(), recent) == (5000, "רובע טו")
