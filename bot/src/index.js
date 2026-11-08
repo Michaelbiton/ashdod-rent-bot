@@ -17,6 +17,10 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/setup") return setup(url, env);
+    if (url.pathname === "/scrape") {
+      if (url.searchParams.get("key") !== env.TELEGRAM_WEBHOOK_SECRET) return new Response("forbidden", { status: 403 });
+      return new Response(`github dispatch: ${await triggerScrape(env)}`);
+    }
     if (url.pathname !== "/webhook" || request.method !== "POST") return new Response("not found", { status: 404 });
     if (request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.TELEGRAM_WEBHOOK_SECRET) {
       return new Response("forbidden", { status: 403 });
@@ -30,7 +34,27 @@ export default {
     }
     return new Response("ok"); // always 200, or Telegram retries the update forever
   },
+
+  // Cloudflare cron (wrangler.toml [triggers]): GitHub's own schedule drifts by hours, so we start the scrape here.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(triggerScrape(env));
+  },
 };
+
+async function triggerScrape(env) {
+  const r = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/scrape.yml/dispatches`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "ashdod-rent-bot",
+    },
+    body: JSON.stringify({ ref: "main" }),
+  });
+  if (!r.ok) console.error("scrape dispatch failed", r.status, await r.text());
+  return r.status;
+}
 
 async function setup(url, env) {
   if (url.searchParams.get("key") !== env.TELEGRAM_WEBHOOK_SECRET) return new Response("forbidden", { status: 403 });

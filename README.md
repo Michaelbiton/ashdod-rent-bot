@@ -86,7 +86,10 @@ npx wrangler deploy
 4. **Actions → scrape → Run workflow** כדי להריץ פעם ראשונה.
    - בפעם הראשונה שהסורק רואה חיפוש, הוא שולח את הדירות **הקיימות** שמתאימות לו: עד 10 מכל אתר, קודם ההתאמות המלאות.
    - משם והלאה מגיעות התראות רק על מודעות חדשות. גם חיפוש שנפתח בהמשך מקבל קודם את הדירות הקיימות.
-5. מעכשיו זה רץ לבד כל שעה (ב-:07). GitHub לפעמים מאחר ריצות בכמה דקות.
+5. התזמון השעתי מגיע מהבוט ב-Cloudflare (ב-:07), כי התזמון של GitHub עצמו מתעכב בשעות בריפו קטן. בשביל זה הבוט צריך טוקן GitHub:
+   - צור fine-grained token ב-[github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new): רק הריפו הזה, הרשאת **Actions: Read and write**.
+   - בתיקייה `bot` הרץ `npx wrangler secret put GITHUB_TOKEN` והדבק אותו.
+   - סריקה ידנית בכל רגע: `https://<כתובת הבוט>/scrape?key=<TELEGRAM_WEBHOOK_SECRET>`.
 
 ---
 

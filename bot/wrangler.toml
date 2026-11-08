@@ -9,3 +9,8 @@ compatibility_date = "2026-10-01"
 [vars]
 SUPABASE_URL = "https://dhvzdueapyzluaxhfdwb.supabase.co"
 ADMIN_CHAT_ID = "584897131"
+GITHUB_REPO = "Michaelbiton/ashdod-rent-bot"
+
+# Starts the GitHub scrape every hour at :07 (needs the GITHUB_TOKEN secret).
+[triggers]
+crons = ["7 * * * *"]
