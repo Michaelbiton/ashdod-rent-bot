@@ -1,7 +1,10 @@
-"""One scrape pass. Run hourly by GitHub Actions: python -m scraper.main"""
+"""One scrape pass. Started hourly by the bot's Cloudflare cron: python -m scraper.main"""
 import logging
 import os
 import time
+from datetime import datetime, timezone
+
+import requests
 
 from . import dedupe, summarizer
 from .db import DB
@@ -14,6 +17,7 @@ log = logging.getLogger("scraper")
 MAX_DETAIL_FETCHES = 30   # per source per run; new listings beyond this are matched on list data only
 FAILS_BEFORE_WARNING = 3
 BACKFILL_LIMIT = 10       # existing listings sent per source when a search is first seen
+APIFY_MARGIN_USD = 0.3    # stop paid sources this close to the monthly Apify limit, before Apify blocks the account
 
 
 def enabled_sources():
@@ -25,11 +29,47 @@ def enabled_sources():
     return sources
 
 
+def due(src, db: DB) -> bool:
+    """Paid sources run every EVERY_HOURS (0 = never); free ones every pass."""
+    every = getattr(src, "EVERY_HOURS", 1)
+    if every <= 0:
+        return False
+    last = db.kv_get(f"last_run:{src.NAME}")
+    if last:
+        hours = (datetime.now(timezone.utc) - datetime.fromisoformat(last)).total_seconds() / 3600
+        if hours < every - 0.25:  # small slack: the cron fires at :07 but runs take a few minutes
+            return False
+    return True
+
+
+def apify_budget_ok(db: DB, tg: Telegram, admin) -> bool:
+    """False when this cycle's Apify usage is near the plan limit; tells the admin once per cycle."""
+    try:
+        r = requests.get("https://api.apify.com/v2/users/me/limits", timeout=30,
+                         headers={"Authorization": f"Bearer {os.environ['APIFY_TOKEN']}"})
+        r.raise_for_status()
+        data = r.json()["data"]
+    except Exception:
+        log.warning("could not read Apify usage; running anyway", exc_info=True)
+        return True
+    used = data.get("current", {}).get("monthlyUsageUsd") or 0
+    limit = data.get("limits", {}).get("maxMonthlyUsageUsd") or 5
+    cycle_end = (data.get("monthlyUsageCycle") or {}).get("endAt", "")
+    log.info("apify usage %.2f / %.2f USD (cycle ends %s)", used, limit, cycle_end[:10])
+    if used < limit - APIFY_MARGIN_USD:
+        return True
+    if admin and db.kv_get("apify_budget_notice") != cycle_end:
+        db.kv_set("apify_budget_notice", cycle_end)
+        tg.send_text(admin, f"💸 התקציב החודשי של Apify כמעט נגמר ({used:.2f}$ מתוך {limit:.0f}$).\n"
+                            f"יד2 ופייסבוק מושהים עד {cycle_end[:10] or 'תחילת החודש הבא'}. הומלס וקומו ממשיכים כרגיל.")
+    return False
+
+
 def run_source(src, db: DB, tg: Telegram, session, searches, recent, admin):
     """Returns True when the source was fetched successfully."""
     fail_key = f"fails:{src.NAME}"
     try:
-        items = src.fetch(session)
+        items = src.fetch(session, searches)
         if not items and getattr(src, "EMPTY_IS_ERROR", False):  # an empty board: page changed or blocked
             raise RuntimeError("no listings returned")
     except Exception as e:
@@ -131,7 +171,17 @@ def main():
     recent = db.recent_listings()
     session = http_session()
     log.info("%d active searches, %d recent listings", len(searches), len(recent))
+    budget_ok = None
     for src in enabled_sources():
+        if getattr(src, "PAID", False):
+            if not searches or not due(src, db):
+                log.info("%s: skipped this pass", src.NAME)
+                continue
+            if budget_ok is None:
+                budget_ok = apify_budget_ok(db, tg, admin)
+            if not budget_ok:
+                continue
+            db.kv_set(f"last_run:{src.NAME}", datetime.now(timezone.utc).isoformat())
         if run_source(src, db, tg, session, searches, recent, admin):
             backfill(src.NAME, db, tg, searches, recent)
 

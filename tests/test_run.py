@@ -60,7 +60,7 @@ class FakeSource:
     def __init__(self, batches):
         self.batches = batches
 
-    def fetch(self, session):
+    def fetch(self, session, searches=None):
         return self.batches.pop(0)
 
 
@@ -128,7 +128,7 @@ def test_failure_warning(monkeypatch):
     db, tg = FakeDB(), FakeTG()
 
     class Broken(FakeSource):
-        def fetch(self, session):
+        def fetch(self, session, searches=None):
             raise RuntimeError("blocked")
 
     for _ in range(3):

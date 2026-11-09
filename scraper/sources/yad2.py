@@ -15,6 +15,8 @@ from ..normalize import norm_neighborhood, norm_phone, norm_street
 log = logging.getLogger(__name__)
 NAME = "yad2"
 NEEDS_DETAILS = False
+PAID = True
+EVERY_HOURS = float(os.environ.get("YAD2_EVERY_HOURS") or "4")  # keeps Apify inside the free $5/month
 ACTOR = "nice_dev~yad2-listings-scraper"
 API = "https://api.apify.com/v2"
 RUN_TIMEOUT = 480  # seconds; the GitHub job allows 15 minutes
@@ -27,10 +29,27 @@ ACTOR_INPUT = {
     "onlyNew": True,
     "stateKey": "ashdod-rent-v2",
     "maxItems": int(os.environ.get("YAD2_MAX_ITEMS", "25")),
-    "extractDetails": True,
-    "includeContacts": True,
+    "extractDetails": True,       # amenities and dates; $0.00009 per listing
+    "includeContacts": False,     # the phone costs $0.00059 per listing; it's on the listing page anyway
+    "withPriceOnly": True,        # listings without a price are never sent, so don't pay for them
     "stopOnBlocked": True,
 }
+
+
+def search_filters(searches: list[dict] | None) -> dict:
+    """The widest price/rooms range covering every active search, so we only pay for listings someone could get."""
+    if not searches:
+        return {}
+    out = {}
+    for low_key, high_key, low_in, high_in in [("price_min", "price_max", "minPrice", "maxPrice"),
+                                               ("rooms_min", "rooms_max", "minRooms", "maxRooms")]:
+        lows = [s.get(low_key) for s in searches]
+        highs = [s.get(high_key) for s in searches]
+        if all(v is not None for v in lows):
+            out[low_in] = float(min(lows)) if "Rooms" in low_in else int(min(lows))
+        if all(v is not None for v in highs):
+            out[high_in] = float(max(highs)) if "Rooms" in high_in else int(max(highs))
+    return out
 
 
 def from_item(it: dict) -> Listing:
@@ -63,11 +82,13 @@ def from_item(it: dict) -> Listing:
     )
 
 
-def fetch(session) -> list[Listing]:
+def fetch(session, searches=None) -> list[Listing]:
     # Start the run and poll it: the run-sync endpoint gives up after ~5 minutes, and detail pages take longer.
     api = requests.Session()
     api.headers["Authorization"] = f"Bearer {os.environ['APIFY_TOKEN']}"
-    r = api.post(f"{API}/acts/{ACTOR}/runs", params={"timeout": RUN_TIMEOUT}, json=ACTOR_INPUT, timeout=30)
+    actor_input = {**ACTOR_INPUT, **search_filters(searches)}
+    log.info("yad2 filters: %s", search_filters(searches))
+    r = api.post(f"{API}/acts/{ACTOR}/runs", params={"timeout": RUN_TIMEOUT}, json=actor_input, timeout=30)
     r.raise_for_status()
     run = r.json()["data"]
     deadline = time.time() + RUN_TIMEOUT + 60

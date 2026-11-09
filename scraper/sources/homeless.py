@@ -69,7 +69,7 @@ def parse_details(html: str, listing: Listing) -> None:
         listing.images = thumbs
 
 
-def fetch(session) -> list[Listing]:
+def fetch(session, searches=None) -> list[Listing]:
     return parse_list(get_html(session, LIST_URL))
 
 

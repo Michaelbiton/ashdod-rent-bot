@@ -18,6 +18,10 @@ from ..normalize import find_neighborhood, mentions_other_city, norm_phone, pars
 log = logging.getLogger(__name__)
 NAME = "facebook"
 NEEDS_DETAILS = False
+PAID = True
+# Apify charges for every post in the groups (~860/day), so Facebook is off by default (0) to stay
+# inside the free $5/month. Set FB_EVERY_HOURS (e.g. 24) as a GitHub variable to turn it on.
+EVERY_HOURS = float(os.environ.get("FB_EVERY_HOURS") or "0")
 ACTOR = "memo23~facebook-public-group-posts-scraper"
 API = "https://api.apify.com/v2"
 RUN_TIMEOUT = 420
@@ -146,7 +150,7 @@ def from_post(post: dict) -> Listing | None:
     )
 
 
-def fetch(session) -> list[Listing]:
+def fetch(session, searches=None) -> list[Listing]:
     urls = groups()
     if not urls:
         return []

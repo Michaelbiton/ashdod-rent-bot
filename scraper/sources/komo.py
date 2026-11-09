@@ -79,7 +79,7 @@ def parse_details(html: str, listing: Listing) -> None:
         listing.has_parking = True
 
 
-def fetch(session) -> list[Listing]:
+def fetch(session, searches=None) -> list[Listing]:
     return parse_list(get_html(session, LIST_URL))
 
 
