@@ -1,4 +1,4 @@
-"""Public Facebook groups via the Apify actor memo23/facebook-public-group-posts-scraper.
+"""Public Facebook groups via the Apify actor dami_studio/facebook-groups-scraper.
 
 Groups are listed in config/facebook_groups.txt (one URL per line). Posts are free text, so
 parse_post() pulls out price, rooms, neighborhood, amenities and phone with simple rules and
@@ -19,10 +19,11 @@ log = logging.getLogger(__name__)
 NAME = "facebook"
 NEEDS_DETAILS = False
 PAID = True
-# Apify charges for every post in the groups (~860/day), so Facebook is off by default (0) to stay
-# inside the free $5/month. Set FB_EVERY_HOURS (e.g. 24) as a GitHub variable to turn it on.
-EVERY_HOURS = float(os.environ.get("FB_EVERY_HOURS") or "0")
-ACTOR = "memo23~facebook-public-group-posts-scraper"
+# $0.0007 per post kept + $0.002 per run. The keyword filter runs inside the actor, so we only pay for
+# posts that look like rental offers (~20% of the ~860 posts/day in the groups). Set FB_EVERY_HOURS=0 to turn off.
+EVERY_HOURS = float(os.environ.get("FB_EVERY_HOURS") or "4")
+ACTOR = "dami_studio~facebook-groups-scraper"
+KEYWORDS = ["להשכרה", "להשכיר", "שכירות", "משכיר", "משכירה", "פנויה"]
 API = "https://api.apify.com/v2"
 RUN_TIMEOUT = 420
 GROUPS_FILE = Path(__file__).resolve().parents[2] / "config" / "facebook_groups.txt"
@@ -158,10 +159,11 @@ def fetch(session, searches=None) -> list[Listing]:
     api.headers["Authorization"] = f"Bearer {os.environ['APIFY_TOKEN']}"
     actor_input = {
         "startUrls": [{"url": u} for u in urls],
-        "viewOption": "CHRONOLOGICAL",
-        "monitoringMode": True,          # only posts not returned by an earlier run
-        "onlyPostsNewerThanHours": 72,   # never reach back further than three days
-        "maxItems": int(os.environ.get("FB_MAX_POSTS_PER_GROUP", "30")),
+        "keywords": KEYWORDS,            # filtered inside the actor: posts without them aren't charged
+        "onlyNewPosts": True,            # each run continues from the newest post the previous one saw
+        "onlyPostsNewerThan": "3 days",  # never reach back further than that
+        "maxPostsPerGroup": int(os.environ.get("FB_MAX_POSTS_PER_GROUP") or "40"),
+        "resultsLimit": 200,
     }
     r = api.post(f"{API}/acts/{ACTOR}/runs", params={"timeout": RUN_TIMEOUT}, json=actor_input, timeout=30)
     r.raise_for_status()
