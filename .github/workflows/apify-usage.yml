@@ -1,0 +1,47 @@
+name: apify-usage
+
+# Prints this month's Apify spend per actor (amounts only, never the token). Run by hand from the Actions tab.
+on:
+  workflow_dispatch:
+
+jobs:
+  usage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Spend per actor
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: |
+          python3 - <<'EOF'
+          import json, os, urllib.request
+          from collections import defaultdict
+
+          def get(path):
+              req = urllib.request.Request(f"https://api.apify.com/v2{path}",
+                                           headers={"Authorization": f"Bearer {os.environ['APIFY_TOKEN']}"})
+              return json.load(urllib.request.urlopen(req))["data"]
+
+          limits = get("/users/me/limits")
+          print("plan limits:", json.dumps(limits.get("limits", {}).get("maxMonthlyUsageUsd")),
+                "| used this cycle USD:", json.dumps(limits.get("current", {}).get("monthlyUsageUsd")))
+          spend, runs, items = defaultdict(float), defaultdict(int), defaultdict(int)
+          offset = 0
+          while True:
+              page = get(f"/actor-runs?limit=1000&offset={offset}&desc=1")
+              for r in page["items"]:
+                  actor = r.get("actId")
+                  spend[actor] += r.get("usageTotalUsd") or 0
+                  runs[actor] += 1
+              if len(page["items"]) < 1000:
+                  break
+              offset += 1000
+          names = {}
+          for actor in spend:
+              try:
+                  a = get(f"/acts/{actor}")
+                  names[actor] = f"{a.get('username')}/{a.get('name')}"
+              except Exception:
+                  names[actor] = actor
+          for actor in sorted(spend, key=spend.get, reverse=True):
+              print(f"{names[actor]:55s} runs={runs[actor]:4d}  usd={spend[actor]:.2f}  per_run={spend[actor]/runs[actor]:.4f}")
+          EOF
